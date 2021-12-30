@@ -1,5 +1,7 @@
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const { jwtSecret, jwtExpire } = require("../config/keys");
 
 exports.signupController = async (req, res) => {
   // destructure incoming userdata
@@ -33,6 +35,50 @@ exports.signupController = async (req, res) => {
     // console.log(newUser.password);
   } catch (err) {
     console.log("signup controller error", err);
+    res.status(500).json({
+      errorMessage: "Server error",
+    });
+  }
+};
+
+exports.signinController = async (req, res) => {
+  // destructure incoming userdata
+  const { email, password } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({
+        errorMessage: "Invalid credentials",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        errorMessage: "invalid credentials",
+      });
+    }
+
+    // jwt payload
+    const payload = {
+      user: {
+        _id: user._id,
+      },
+    };
+ 
+    jwt.sign(payload, jwtSecret, { expiresIn: jwtExpire }, (err, token) => {
+      if (err) console.log("jwt error", err);
+      const { _id, username, email, role } = user;
+
+      // if successfull send back token and destructured user above
+      res.json({
+        token,
+        user: { _id, username, email, role },
+      });
+    });
+  } catch (err) {
+    console.log("signinController err", err);
     res.status(500).json({
       errorMessage: "Server error",
     });
